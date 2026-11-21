@@ -1,0 +1,86 @@
+import { useState } from 'react'
+import { BookOpen, Info, LockKeyhole, Volume2, VolumeX } from 'lucide-react'
+import { CourtyardStage } from './components/CourtyardStage'
+import { Modal } from './components/Modal'
+import { ReflectionPanel } from './components/ReflectionPanel'
+import { scripture, translation } from './reflection/scripture'
+import type { VerseId } from './reflection/scripture'
+import { useReflection } from './reflection/useReflection'
+import { useAvatarState, useReducedMotion } from './scene/useAvatarState'
+import { useSpeech } from './speech/useSpeech'
+
+export function App() {
+  const [draft, setDraft] = useState('')
+  const [composing, setComposing] = useState(false)
+  const [modal, setModal] = useState<VerseId | 'about' | null>(null)
+  const reducedMotion = useReducedMotion()
+  const { exchange, send } = useReflection()
+  const speech = useSpeech(reducedMotion)
+  const voiceAvailable = Boolean(speech.voice)
+  const voiceLabel = voiceAvailable ? (speech.enabled ? 'Voice on' : 'Voice off')
+    : speech.discovering ? 'Checking voice…' : 'Voice unavailable'
+  const response = exchange?.response
+  const canReplay = Boolean(response && response.kind !== 'safety')
+  const state = useAvatarState(speech.phase, response?.kind === 'safety' ? 0 : exchange?.id ?? 0, composing, reducedMotion)
+
+  function submit(text: string) {
+    const entry = send(text)
+    if (!entry) return
+    setDraft('')
+    setComposing(false)
+    if (entry.response.kind === 'safety') speech.reset()
+    else speech.play(entry.response.text)
+  }
+
+  return (
+    <div className="site">
+      <a className="skip-link" href="#reflection-input">Skip to reflection</a>
+      <header className="site-header">
+        <div className="brand">
+          <img src={import.meta.env.BASE_URL + 'mark.svg'} alt="" width={38} height={38} />
+          <span>Stillwater</span>
+        </div>
+        <div className="header-actions">
+          <button type="button" className="about-button" aria-label="About" onClick={() => setModal('about')}>
+            <Info size={17} strokeWidth={1.65} aria-hidden="true" /><span>About</span>
+          </button>
+          <button type="button" className="voice-button" aria-pressed={voiceAvailable && speech.enabled}
+            disabled={!voiceAvailable} onClick={speech.toggleVoice} title={speech.voice?.name || 'An on-device English voice is required'}>
+            {voiceAvailable && speech.enabled ? <Volume2 size={17} aria-hidden="true" /> : <VolumeX size={17} aria-hidden="true" />}
+            <span>{voiceLabel}</span>
+          </button>
+        </div>
+      </header>
+
+      <main className="experience">
+        <CourtyardStage state={state} reducedMotion={reducedMotion} mouth={speech.mouth} phase={speech.phase}
+          words={speech.words} index={speech.index} notice={speech.notice} hasResponse={canReplay} showVerse={!exchange}
+          replay={() => { if (response && canReplay) speech.play(response.text) }}
+          pause={speech.togglePause} stop={speech.stop} onVerse={() => setModal('still')} />
+        <ReflectionPanel draft={draft} setDraft={setDraft} setComposing={setComposing} submit={submit}
+          exchange={exchange} onVerse={setModal} />
+      </main>
+
+      <footer className="site-footer">
+        <p><LockKeyhole size={14} aria-hidden="true" /> Private session · Nothing saved</p>
+        <p>Local demo · Simulated biblical reflection</p>
+      </footer>
+
+      {modal === 'about' && (
+        <Modal title="About Stillwater" eyebrow="Local prototype" dismiss={() => setModal(null)}>
+          <p>Stillwater offers written reflections based on biblical teachings. Its Jesus-inspired character and voice are a dramatized simulation. The guidance comes from the app’s local demo scripts.</p>
+          <p>Stillwater is intended for personal reflection. For pastoral care, practical support, or professional advice, reach out to someone you trust.</p>
+          <p>Messages stay in this tab for the session. The app uses on-device browser voices and contains no tracking.</p>
+        </Modal>
+      )}
+      {modal && modal !== 'about' && (
+        <Modal title={scripture[modal].reference} eyebrow="Scripture" dismiss={() => setModal(null)}>
+          <blockquote>{modal === 'still' ? scripture[modal].text : '“' + scripture[modal].text + '”'}</blockquote>
+          <a className="source-link" href={scripture[modal].source} target="_blank" rel="noreferrer">
+            <BookOpen size={16} aria-hidden="true" />{translation} · Read in context<span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        </Modal>
+      )}
+    </div>
+  )
+}
