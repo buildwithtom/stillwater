@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { restingMouth } from './articulation'
 import { mouthAt, tokenize } from './timing'
+import { recordingFor, recordingWordAt } from './recordings'
+import type { VoiceRecording } from './recordings'
+import { recordingAudio, releaseRecording, supportsRecordings } from './recordingPlayback'
 import type { MouthFrame, SpokenWord } from './timing'
 
 export type SpeechPhase = 'idle' | 'queued' | 'reading' | 'speaking' | 'paused'
 type SpeechView = { phase: SpeechPhase; words: readonly SpokenWord[]; index: number }
 type Session = {
-  words: SpokenWord[]
   phase: Exclude<SpeechPhase, 'idle'>
   index: number
   wordAt: number
@@ -17,6 +19,7 @@ type Session = {
   pausedAt: number
   frame: number
   utterance?: SpeechSynthesisUtterance
+  recording?: { track: VoiceRecording; audio: HTMLAudioElement }
 }
 
 const discoveryWindow = 2200
@@ -44,6 +47,7 @@ function detach(utterance?: SpeechSynthesisUtterance) {
 export function useSpeech(reducedMotion: boolean) {
   const synthesis = typeof window !== 'undefined' && 'speechSynthesis' in window &&
     'SpeechSynthesisUtterance' in window ? window.speechSynthesis : null
+  const [canPlayRecordings] = useState(supportsRecordings)
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
   const [discovering, setDiscovering] = useState(Boolean(synthesis))
   const stillDiscovering = useRef(Boolean(synthesis))
@@ -59,6 +63,7 @@ export function useSpeech(reducedMotion: boolean) {
     session.current = null
     if (active) {
       cancelAnimationFrame(active.frame)
+      releaseRecording(active.recording?.audio)
       detach(active.utterance)
       if (active.utterance && synthesis) {
         synthesis.cancel()
@@ -72,7 +77,7 @@ export function useSpeech(reducedMotion: boolean) {
   }, [synthesis])
 
   useEffect(() => {
-    if (!synthesis) return
+    if (!synthesis) return () => cancel(false, false)
     const refresh = (expired = false) => {
       const available = synthesis.getVoices()
       setVoices(available)
@@ -97,9 +102,10 @@ export function useSpeech(reducedMotion: boolean) {
     setNotice('')
     const words = tokenize(text)
     if (!words.length) return
+    const track = enabledRef.current && canPlayRecordings ? recordingFor(text, words.length) : undefined
     const voice = synthesis ? chooseVoice(synthesis.getVoices()) : undefined
-    const waitingForVoice = enabledRef.current && Boolean(synthesis) && !voice && stillDiscovering.current
-    const willSpeak = enabledRef.current && Boolean(voice || waitingForVoice)
+    const waitingForVoice = Boolean(synthesis) && !voice && stillDiscovering.current
+    const willSpeak = enabledRef.current && Boolean(track || voice || waitingForVoice)
     const unavailable = synthesis ? 'No on-device English voice is available.' : 'Speech is unavailable in this browser.'
 
     if (!willSpeak) {
@@ -112,9 +118,8 @@ export function useSpeech(reducedMotion: boolean) {
 
     const now = performance.now()
     const active: Session = {
-      words,
       phase: willSpeak ? 'queued' : 'reading',
-      index: 0,
+      index: track ? -1 : 0,
       wordAt: now,
       startedAt: now,
       lastBoundary: -Infinity,
@@ -139,6 +144,7 @@ export function useSpeech(reducedMotion: boolean) {
         return
       }
       active.phase = 'reading'
+      active.index = Math.max(0, active.index)
       active.wordAt = performance.now()
       publish()
     }
@@ -146,6 +152,12 @@ export function useSpeech(reducedMotion: boolean) {
     let nextVoiceCheck = now
     const tick = (time: number) => {
       if (session.current !== active) return
+      if (active.recording) {
+        if (active.phase === 'speaking') syncRecording()
+        else if (active.phase === 'queued' && time - active.startedAt > 9000) fallbackFromRecording()
+        if (session.current === active) active.frame = requestAnimationFrame(tick)
+        return
+      }
       if (active.phase === 'queued') {
         if (active.utterance && time - active.startedAt > 3000) {
           useSilentTiming(voiceFailure)
@@ -227,7 +239,68 @@ export function useSpeech(reducedMotion: boolean) {
         useSilentTiming(voiceFailure)
       }
     }
-    if (willSpeak && voice) startSpeech(voice)
+    function syncRecording() {
+      if (!active.recording) return
+      const { track: playing, audio } = active.recording
+      const timeMs = audio.currentTime * 1000
+      const index = recordingWordAt(playing, timeMs)
+      if (index !== active.index) {
+        active.index = index
+        publish()
+      }
+      if (index < 0) {
+        mouth.current = restingMouth
+        return
+      }
+      const [start, end] = playing.words[index]
+      const elapsed = timeMs - start
+      const tempo = (end - start) / words[index].articulation.duration
+      mouth.current = audio.readyState < 3 || timeMs >= end
+        ? restingMouth
+        : mouthAt(words, index, elapsed, tempo)
+    }
+
+    function fallbackFromRecording() {
+      if (session.current !== active || !active.recording) return
+      const started = active.phase !== 'queued'
+      releaseRecording(active.recording.audio)
+      active.recording = undefined
+      if (started) {
+        setNotice('Playback was interrupted. You can replay or read the reflection.')
+        cancel(true)
+        return
+      }
+      active.index = 0
+      active.startedAt = performance.now()
+      const backup = synthesis ? chooseVoice(synthesis.getVoices()) : undefined
+      if (backup) startSpeech(backup)
+      else if (!synthesis || !stillDiscovering.current) useSilentTiming(unavailable)
+    }
+
+    function startRecording(recording: VoiceRecording) {
+      const audio = recordingAudio(recording)
+      active.recording = { audio, track: recording }
+      audio.onplaying = () => {
+        if (session.current !== active) return
+        active.phase = 'speaking'
+        syncRecording()
+        publish()
+      }
+      audio.onpause = () => {
+        if (session.current !== active || audio.ended || active.phase !== 'speaking') return
+        active.phase = 'paused'
+        mouth.current = restingMouth
+        publish()
+      }
+      audio.onended = () => {
+        if (session.current === active) cancel(true)
+      }
+      audio.onerror = fallbackFromRecording
+      void audio.play().catch(fallbackFromRecording)
+    }
+
+    if (track) startRecording(track)
+    else if (willSpeak && voice) startSpeech(voice)
     if (session.current === active) active.frame = requestAnimationFrame(tick)
   }
 
@@ -240,6 +313,18 @@ export function useSpeech(reducedMotion: boolean) {
 
   function togglePause() {
     const active = session.current
+    if (active?.recording) {
+      const { audio } = active.recording
+      if (active.phase === 'speaking') audio.pause()
+      else if (active.phase === 'paused') {
+        void audio.play().catch(() => {
+          if (session.current !== active) return
+          setNotice('Playback was interrupted. You can replay or read the reflection.')
+          cancel(true)
+        })
+      }
+      return
+    }
     if (!active?.utterance || !synthesis) return
     const now = performance.now()
     if (active.phase === 'speaking') {
@@ -263,6 +348,7 @@ export function useSpeech(reducedMotion: boolean) {
     mouth,
     enabled,
     notice,
+    canPlayRecordings,
     voice: chooseVoice(voices),
     discovering,
     play,

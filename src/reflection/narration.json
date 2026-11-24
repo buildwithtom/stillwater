@@ -1,0 +1,25 @@
+{
+  "loneliness": {
+    "reply": "It hurts to feel forgotten by people you care about. Psalm 34 describes God as near to people whose hearts are broken, and John 13 calls us to care for one another. You could start by telling one person you trust how things have felt lately. Friendship makes room for care in both directions. Who might be safe to reach out to today?",
+    "followUp": "Reaching out can feel vulnerable when you’ve been disappointed. Try a simple invitation, such as asking someone to take a walk or share a meal. Even if it takes time to reconnect, your need for companionship deserves care. Is there someone who has listened kindly before?"
+  },
+  "anxiety": {
+    "reply": "Uncertainty can make tomorrow feel heavy before it has even arrived. In Matthew 6, Jesus teaches his listeners to attend to the troubles of the day in front of them. You might write down one thing you can act on today, then share the rest with someone you trust. What’s one manageable thing you can do before the day ends?",
+    "followUp": "If the list still feels too big, make the next step smaller. A glass of water, a short walk, or a conversation can give you a place to start. What would make today feel a little more manageable?"
+  },
+  "forgiveness": {
+    "reply": "When someone hurts you, forgiveness can take time. Ephesians encourages tenderness and forgiveness in light of the grace we’ve received. You can take that seriously and still name what happened, protect your boundaries, and ask someone wise to walk with you. What would give you the space you need to begin?",
+    "followUp": "A first step might be telling the truth about what happened to someone who can listen without rushing you. You can hope for healing and keep boundaries that protect you. Which boundary would help you feel steadier right now?"
+  },
+  "failure": {
+    "reply": "A setback can make it hard to see anything else about yourself. Psalm 145 describes God as lifting up people who fall. Consider what you can learn, and whether there’s a repair you can make. Then give yourself room to begin again. What’s one thing you’d say to a friend in the same situation?",
+    "followUp": "If you can name something to repair, choose a small action you can carry out. If it will take time, a trusted person can help you face it with honesty and patience. What feels possible today?"
+  },
+  "gratitude": {
+    "reply": "It’s worth pausing to notice something good while it’s still fresh. First Thessalonians makes room for gratitude in every circumstance. You can notice a kindness even on a difficult day. Think of one particular person, moment, or ordinary comfort you’re grateful for. Would you like to take a moment to name it or thank the person involved?",
+    "followUp": "Try writing a sentence about that particular moment, or telling the person what their kindness meant to you. Gratitude often feels more concrete when we name the detail we almost missed."
+  },
+  "unmatched": {
+    "reply": "This local prototype has a small set of written reflections. You can choose a starting point below or try asking about loneliness, worry, forgiveness, feeling like a failure, or gratitude."
+  }
+}

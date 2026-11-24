@@ -16,7 +16,7 @@ export function App() {
   const reducedMotion = useReducedMotion()
   const { exchange, send } = useReflection()
   const speech = useSpeech(reducedMotion)
-  const voiceAvailable = Boolean(speech.voice)
+  const voiceAvailable = speech.canPlayRecordings || Boolean(speech.voice)
   const voiceLabel = voiceAvailable ? (speech.enabled ? 'Voice on' : 'Voice off')
     : speech.discovering ? 'Checking voice…' : 'Voice unavailable'
   const response = exchange?.response
@@ -54,7 +54,7 @@ export function App() {
         <Modal title="About Stillwater" eyebrow="Local prototype" dismiss={() => setModal(null)}>
           <p>Stillwater offers written reflections based on biblical teachings. Its Jesus-inspired character and voice are a dramatized simulation. The guidance comes from the app’s local demo scripts.</p>
           <p>Stillwater is intended for personal reflection. For pastoral care, practical support, or professional advice, reach out to someone you trust.</p>
-          <p>Messages stay in this tab for the session. The app uses on-device browser voices and contains no tracking.</p>
+          <p>Messages stay in this tab for the session. Narration plays from audio bundled with the app, with an on-device browser voice as a backup.</p>
         </Modal>
       )}
       {modal && modal !== 'about' && (

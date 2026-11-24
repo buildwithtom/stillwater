@@ -1,4 +1,5 @@
 import type { VerseId } from './scripture'
+import narration from './narration.json'
 
 export type Reflection = {
   kind: 'reflection' | 'unmatched' | 'safety'
@@ -22,8 +23,8 @@ export const topics = [
     label: 'I feel alone',
     prompt: 'I feel lonely and wonder if my friends still care about me.',
     match: [/\b(lone(?:ly|liness)|isolat\w*|alone|friend\w*|forgotten|left out|no one cares|nobody (?:cares|loves|likes)|don't love me|abandon\w*)\b/],
-    reply: 'It hurts to feel forgotten by people you care about. Psalm 34 describes God as near to people whose hearts are broken, and John 13 calls us to care for one another. You could start by telling one person you trust how things have felt lately. Friendship makes room for care in both directions. Who might be safe to reach out to today?',
-    followUp: 'Reaching out can feel vulnerable when you’ve been disappointed. Try a simple invitation, such as asking someone to take a walk or share a meal. Even if it takes time to reconnect, your need for companionship deserves care. Is there someone who has listened kindly before?',
+    reply: narration.loneliness.reply,
+    followUp: narration.loneliness.followUp,
     verses: ['brokenHeart', 'love'],
   },
   {
@@ -31,8 +32,8 @@ export const topics = [
     label: 'I’m worried about the future',
     prompt: 'I’m anxious and worried about the future.',
     match: [/\b(anxio\w*|anxiety|worr\w*|future|overwhelm\w*|uncertain\w*|scared|fear\w*|panic)\b/],
-    reply: 'Uncertainty can make tomorrow feel heavy before it has even arrived. In Matthew 6, Jesus teaches his listeners to attend to the troubles of the day in front of them. You might write down one thing you can act on today, then share the rest with someone you trust. What’s one manageable thing you can do before the day ends?',
-    followUp: 'If the list still feels too big, make the next step smaller. A glass of water, a short walk, or a conversation can give you a place to start. What would make today feel a little more manageable?',
+    reply: narration.anxiety.reply,
+    followUp: narration.anxiety.followUp,
     verses: ['tomorrow'],
   },
   {
@@ -40,8 +41,8 @@ export const topics = [
     label: 'I’m struggling to forgive',
     prompt: 'I’m struggling to forgive someone who hurt me.',
     match: [/\b(forgiv\w*|grudge\w*|resent\w*|betray\w*|hold a grudge|hurt me)\b/],
-    reply: 'When someone hurts you, forgiveness can take time. Ephesians encourages tenderness and forgiveness in light of the grace we’ve received. You can take that seriously and still name what happened, protect your boundaries, and ask someone wise to walk with you. What would give you the space you need to begin?',
-    followUp: 'A first step might be telling the truth about what happened to someone who can listen without rushing you. You can hope for healing and keep boundaries that protect you. Which boundary would help you feel steadier right now?',
+    reply: narration.forgiveness.reply,
+    followUp: narration.forgiveness.followUp,
     verses: ['forgiving'],
   },
   {
@@ -49,8 +50,8 @@ export const topics = [
     label: 'I feel like I’ve failed',
     prompt: 'I feel like a failure.',
     match: [/\b(fail\w*|mistake\w*|disappoint\w*|not good enough|worthless|messed up|let (?:someone|them|everyone) down)\b/],
-    reply: 'A setback can make it hard to see anything else about yourself. Psalm 145 describes God as lifting up people who fall. Consider what you can learn, and whether there’s a repair you can make. Then give yourself room to begin again. What’s one thing you’d say to a friend in the same situation?',
-    followUp: 'If you can name something to repair, choose a small action you can carry out. If it will take time, a trusted person can help you face it with honesty and patience. What feels possible today?',
+    reply: narration.failure.reply,
+    followUp: narration.failure.followUp,
     verses: ['upheld'],
   },
   {
@@ -58,8 +59,8 @@ export const topics = [
     label: 'I want to practice gratitude',
     prompt: 'I want to pause and practice gratitude.',
     match: [/\b(gratitude|grateful|thank\w*|appreciat\w*|blessings?)\b/],
-    reply: 'It’s worth pausing to notice something good while it’s still fresh. First Thessalonians makes room for gratitude in every circumstance. You can notice a kindness even on a difficult day. Think of one particular person, moment, or ordinary comfort you’re grateful for. Would you like to take a moment to name it or thank the person involved?',
-    followUp: 'Try writing a sentence about that particular moment, or telling the person what their kindness meant to you. Gratitude often feels more concrete when we name the detail we almost missed.',
+    reply: narration.gratitude.reply,
+    followUp: narration.gratitude.followUp,
     verses: ['thanks'],
   },
 ] as const satisfies readonly Topic[]
@@ -112,7 +113,7 @@ export function getReflection(input: string, previousTopic: TopicId | null) {
     topic: null,
     reflection: {
       kind: 'unmatched',
-      text: 'This local prototype has a small set of written reflections. You can choose a starting point below or try asking about loneliness, worry, forgiveness, feeling like a failure, or gratitude.',
+      text: narration.unmatched.reply,
       verses: [],
     } satisfies Reflection,
   }
