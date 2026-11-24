@@ -1,11 +1,8 @@
-import { BookOpen, ChevronRight, Feather, HeartHandshake, Leaf, Send, Sprout, Sunrise } from 'lucide-react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import { topics } from '../reflection/demo'
 import type { Reflection } from '../reflection/demo'
 import { scripture } from '../reflection/scripture'
 import type { VerseId } from '../reflection/scripture'
-
-const topicIcons = [Leaf, Sunrise, HeartHandshake, Sprout, Feather]
 
 export function ReflectionPanel({ draft, setDraft, setComposing, submit, exchange, onVerse }: {
   draft: string
@@ -30,8 +27,7 @@ export function ReflectionPanel({ draft, setDraft, setComposing, submit, exchang
   return (
     <section className="reflection-panel" aria-labelledby="main-heading">
       <div className="reflection-intro">
-        <p className="eyebrow ruling">Local reflection demo</p>
-        <h1 id="main-heading">What’s on your <em>heart today?</em></h1>
+        <h1 id="main-heading">What’s on your <span>heart today?</span></h1>
         {exchange === null && <p className="intro-copy">A quiet place for questions and biblical reflection.</p>}
       </div>
       <p className="sr-only" role="status">{exchange?.response.kind !== 'safety' ? exchange?.response.text : ''}</p>
@@ -44,7 +40,7 @@ export function ReflectionPanel({ draft, setDraft, setComposing, submit, exchang
             <div className="references" aria-label="Scripture references">
               {exchange.response.verses.map((id) => (
                 <button key={id} className="reference" type="button" onClick={() => onVerse(id)}>
-                  <BookOpen size={14} aria-hidden="true" />{scripture[id].reference}
+                  {scripture[id].reference}
                 </button>
               ))}
             </div>
@@ -61,25 +57,20 @@ export function ReflectionPanel({ draft, setDraft, setComposing, submit, exchang
             setComposing(true)
           }} onKeyDown={onKeyDown} />
         <button type="submit" className="send-button" aria-label="Send reflection" disabled={!draft.trim()}>
-          <Send size={19} strokeWidth={1.65} />
+          Send
         </button>
       </form>
       {exchange?.response.kind !== 'safety' && (
         <div className="suggestions">
-          <p className="eyebrow" id="suggestion-heading">{exchange ? 'Explore another topic' : 'A place to begin'}</p>
+          <p className="eyebrow" id="suggestion-heading">{exchange ? 'Another topic' : 'Try a prompt'}</p>
           <ul aria-labelledby="suggestion-heading">
-            {topics.map((topic, index) => {
-              const Icon = topicIcons[index]
-              return (
-                <li key={topic.id}>
-                  <button className="topic" type="button" onClick={() => submit(topic.prompt)}>
-                    <Icon size={16} strokeWidth={1.55} aria-hidden="true" />
-                    <span>{topic.label}</span>
-                    <ChevronRight className="topic-chevron" size={15} aria-hidden="true" />
-                  </button>
-                </li>
-              )
-            })}
+            {topics.map((topic) => (
+              <li key={topic.id}>
+                <button className="topic" type="button" onClick={() => submit(topic.prompt)}>
+                  {topic.label}
+                </button>
+              </li>
+            ))}
           </ul>
         </div>
       )}

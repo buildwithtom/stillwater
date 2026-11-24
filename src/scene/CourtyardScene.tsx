@@ -99,7 +99,7 @@ function World({ mobile, onStatus, ...avatar }: AvatarProps & { mobile: boolean;
       <directionalLight color="#ffead0" intensity={2.68} position={[-3.8, 5.05, 2.6]} castShadow={!mobile}
         shadow-camera-left={-4.8} shadow-camera-right={4.8} shadow-camera-top={4.3} shadow-camera-bottom={-3.6}
         shadow-camera-near={.35} shadow-camera-far={17} shadow-mapSize={[1024, 1024]} shadow-bias={-.00035}
-        shadow-normalBias={.024} />
+        shadow-normalBias={.024} shadow-radius={2.4} shadow-intensity={.76} />
       <directionalLight color="#e5c7a0" intensity={.26} position={[4, 3, -1]} />
       <Viewpoint />
       <Stonework texture={stone} />

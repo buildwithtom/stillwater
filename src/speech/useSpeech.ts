@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { estimateViseme, tokenize } from './timing'
-import type { SpokenWord, Viseme } from './timing'
+import { restingMouth } from './articulation'
+import { mouthAt, tokenize } from './timing'
+import type { MouthFrame, SpokenWord } from './timing'
 
 export type SpeechPhase = 'idle' | 'queued' | 'reading' | 'speaking' | 'paused'
-export type MouthFrame = { shape: Viseme; amount: number }
 type SpeechView = { phase: SpeechPhase; words: readonly SpokenWord[]; index: number }
 type Session = {
   words: SpokenWord[]
@@ -12,13 +12,14 @@ type Session = {
   wordAt: number
   startedAt: number
   lastBoundary: number
+  boundaryIndex: number
+  tempo: number
   pausedAt: number
   frame: number
   utterance?: SpeechSynthesisUtterance
 }
 
 const discoveryWindow = 2200
-const restingMouth: MouthFrame = { shape: 'closed', amount: 0 }
 const empty: SpeechView = { phase: 'idle', words: [], index: -1 }
 
 function chooseVoice(voices: readonly SpeechSynthesisVoice[]) {
@@ -117,6 +118,8 @@ export function useSpeech(reducedMotion: boolean) {
       wordAt: now,
       startedAt: now,
       lastBoundary: -Infinity,
+      boundaryIndex: -1,
+      tempo: 1,
       pausedAt: 0,
       frame: 0,
     }
@@ -155,25 +158,25 @@ export function useSpeech(reducedMotion: boolean) {
       }
       if (session.current !== active) return
       if (active.phase === 'speaking' || active.phase === 'reading') {
+        const audible = active.phase === 'speaking'
+        const tempo = audible ? active.tempo : .88
         const word = words[active.index]
         const elapsed = Math.max(0, time - active.wordAt)
-        const duration = word.duration * (active.phase === 'reading' ? 0.84 : 1)
-        const hasRecentBoundary = time - active.lastBoundary < duration * 1.55
-        if (elapsed >= duration && !hasRecentBoundary && active.index < words.length - 1) {
+        const duration = word.duration * tempo
+        const boundaryGrace = active.boundaryIndex === active.index ? Math.min(90, duration * .22) : 0
+        if (elapsed >= duration + boundaryGrace && active.index < words.length - 1) {
           active.index += 1
           active.wordAt = time
           publish()
         } else if (
-          (active.phase === 'reading' && active.index === words.length - 1 && elapsed > duration + 500) ||
-          (active.phase === 'speaking' && time - active.startedAt > maxDuration)
+          (!audible && active.index === words.length - 1 && elapsed > duration + 500) ||
+          (audible && time - active.startedAt > maxDuration)
         ) {
           cancel(true)
           return
         }
-        if (active.phase === 'speaking') {
-          const phase = Math.min(1, elapsed / duration)
-          const shape = estimateViseme(word.text, phase)
-          mouth.current = { shape, amount: shape === 'closed' ? 0 : 0.6 + Math.sin(phase * Math.PI) * 0.35 }
+        if (audible) {
+          mouth.current = mouthAt(words, active.index, Math.max(0, time - active.wordAt), tempo)
         }
       }
       if (session.current === active) active.frame = requestAnimationFrame(tick)
@@ -197,10 +200,18 @@ export function useSpeech(reducedMotion: boolean) {
       utterance.onboundary = (event) => {
         if (session.current !== active || active.phase !== 'speaking' || (event.name && event.name !== 'word')) return
         const index = words.findIndex((word) => word.endsAt > event.charIndex)
-        if (index < 0) return
-        active.lastBoundary = performance.now()
-        active.wordAt = active.lastBoundary
-        if (index !== active.index) {
+        if (index <= active.boundaryIndex) return
+        const time = performance.now()
+        if (active.boundaryIndex >= 0) {
+          const nominal = words[index].startTime - words[active.boundaryIndex].startTime
+          const observed = Math.min(1.6, Math.max(.58, (time - active.lastBoundary) / nominal))
+          active.tempo += (observed - active.tempo) * .36
+        }
+        active.boundaryIndex = index
+        active.lastBoundary = time
+        if (index < active.index) return
+        active.wordAt = time
+        if (index > active.index) {
           active.index = index
           publish()
         }

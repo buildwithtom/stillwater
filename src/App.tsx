@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen, Info, LockKeyhole, Volume2, VolumeX } from 'lucide-react'
+import { BookOpen } from 'lucide-react'
 import { CourtyardStage } from './components/CourtyardStage'
 import { Modal } from './components/Modal'
 import { ReflectionPanel } from './components/ReflectionPanel'
@@ -36,35 +36,19 @@ export function App() {
     <div className="site">
       <a className="skip-link" href="#reflection-input">Skip to reflection</a>
       <header className="site-header">
-        <div className="brand">
-          <img src={import.meta.env.BASE_URL + 'mark.svg'} alt="" width={38} height={38} />
-          <span>Stillwater</span>
-        </div>
-        <div className="header-actions">
-          <button type="button" className="about-button" aria-label="About" onClick={() => setModal('about')}>
-            <Info size={17} strokeWidth={1.65} aria-hidden="true" /><span>About</span>
-          </button>
-          <button type="button" className="voice-button" aria-pressed={voiceAvailable && speech.enabled}
-            disabled={!voiceAvailable} onClick={speech.toggleVoice} title={speech.voice?.name || 'An on-device English voice is required'}>
-            {voiceAvailable && speech.enabled ? <Volume2 size={17} aria-hidden="true" /> : <VolumeX size={17} aria-hidden="true" />}
-            <span>{voiceLabel}</span>
-          </button>
-        </div>
+        <span className="brand">Stillwater</span>
+        <button type="button" className="about-button" onClick={() => setModal('about')}>About</button>
       </header>
 
       <main className="experience">
         <CourtyardStage state={state} reducedMotion={reducedMotion} mouth={speech.mouth} phase={speech.phase}
-          words={speech.words} index={speech.index} notice={speech.notice} hasResponse={canReplay} showVerse={!exchange}
+          words={speech.words} index={speech.index} notice={speech.notice} hasResponse={canReplay}
+          voiceLabel={voiceLabel} voiceAvailable={voiceAvailable} voiceOn={speech.enabled} onVoice={speech.toggleVoice}
           replay={() => { if (response && canReplay) speech.play(response.text) }}
-          pause={speech.togglePause} stop={speech.stop} onVerse={() => setModal('still')} />
+          pause={speech.togglePause} stop={speech.stop} />
         <ReflectionPanel draft={draft} setDraft={setDraft} setComposing={setComposing} submit={submit}
           exchange={exchange} onVerse={setModal} />
       </main>
-
-      <footer className="site-footer">
-        <p><LockKeyhole size={14} aria-hidden="true" /> Private session · Nothing saved</p>
-        <p>Local demo · Simulated biblical reflection</p>
-      </footer>
 
       {modal === 'about' && (
         <Modal title="About Stillwater" eyebrow="Local prototype" dismiss={() => setModal(null)}>
@@ -75,7 +59,7 @@ export function App() {
       )}
       {modal && modal !== 'about' && (
         <Modal title={scripture[modal].reference} eyebrow="Scripture" dismiss={() => setModal(null)}>
-          <blockquote>{modal === 'still' ? scripture[modal].text : '“' + scripture[modal].text + '”'}</blockquote>
+          <blockquote>“{scripture[modal].text}”</blockquote>
           <a className="source-link" href={scripture[modal].source} target="_blank" rel="noreferrer">
             <BookOpen size={16} aria-hidden="true" />{translation} · Read in context<span className="sr-only"> (opens in a new tab)</span>
           </a>

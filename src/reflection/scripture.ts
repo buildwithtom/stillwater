@@ -3,11 +3,6 @@ export const translation = 'World English Bible'
 const web = 'https://ebible.org/engwebp/'
 
 export const scripture = {
-  still: {
-    reference: 'Psalm 46:10',
-    text: '“Be still, and know that I am God. I will be exalted among the nations. I will be exalted on the earth.”',
-    source: web + 'PSA046.htm#V10',
-  },
   brokenHeart: {
     reference: 'Psalm 34:18',
     text: 'The LORD is near to those who have a broken heart, and saves those who have a crushed spirit.',

@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. Try **I feel lonely** or select **I feel alone**. Press **Enter** to send and **Shift+Enter** for a line break. Use the speaker button to mute the voice and the controls under the scene to replay, pause, resume, or stop. Select a Bible reference to read the verse and open its source.
+Open the local URL printed by Vite. Try **I feel lonely** or select **I feel alone**. Press **Enter** to send and **Shift+Enter** for a line break. Use the controls under the scene to mute the voice, replay, pause, resume, or stop. Select a Bible reference to read the verse and open its source.
 
 ```sh
 npm run typecheck
@@ -24,7 +24,7 @@ The app uses React, strict TypeScript, Vite, Three.js, React Three Fiber, and Dr
 ## What works
 
 - A real-time WebGL courtyard with stonework, an olive tree, terracotta vessels, animated character, and desktop shadows. The scene loads separately from the interface and uses fewer leaves, a lower pixel ratio, and no shadow maps on phones and coarse-pointer devices.
-- Idle breathing, offset blinks, subtle gaze and head movement, a listening nod, a thinking pose, and speech-driven jaw and lip movement. Reduced-motion mode removes ambient and head movements and softens mouth motion.
+- Idle breathing, paired eyelids, brief gaze shifts, a listening nod, a thinking pose, and speech-driven movement of the lips, jaw and surrounding skin. Reduced-motion mode removes ambient and head movements and softens mouth motion.
 - On-device English voice discovery and selection, with preference given to natural-sounding installed voices. The app cancels prior speech on replay, stop, mute, or submission of a new prompt.
 - Progressive captions follow word boundary events when available and estimate timing between events. The complete response is always available as text. The app keeps working with silent captions or immediate text when speech is unavailable.
 - Five written conversation paths covering loneliness, anxiety, forgiveness, feeling like a failure, and gratitude. The demo recognizes a few short follow-up cues and explains its scope for unmatched inputs.
@@ -32,9 +32,9 @@ The app uses React, strict TypeScript, Vite, Three.js, React Three Fiber, and Dr
 
 ## Prototype limits
 
-- The courtyard is live 3D. The bundled avatar uses sculpted procedural surfaces, image-projected face and cloth detail, and a lightweight facial rig. It is composed for a conversational camera and has a limited range of views and expressions. A commissioned character model would replace this stand-in for production.
+- The courtyard is live 3D. The bundled avatar uses sculpted procedural surfaces, image-projected face and cloth detail, and a facial mesh split at the natural lip line so the original lip texture moves with the jaw. It is composed for a conversational camera and has a limited range of views and expressions. A commissioned character model would replace this stand-in for production.
 - Web Speech API voice quality and pause, resume, and boundary event support depend on the installed voices and browser. The app selects only voices the browser reports as both local and English. With no compatible voice, captions and the full written reply remain available.
-- The lip-sync estimates mouth shapes from the letters in the current word. Browser boundary events improve when the motion changes. Timing and shapes remain approximate and can drift when the browser provides few events.
+- Lip movement is estimated from English pronunciations, vowel stress, and the shapes of neighboring sounds. Browser word boundaries help fit the pace to the voice. Motion can still drift when a browser supplies few events or a voice pronounces a word differently.
 - The safety response relies on simple matching rules. It covers common phrases, can misread context, and can miss other descriptions of danger.
 - The latest message and reflection exist in tab memory. Reloading clears the session. The WebGL fallback is a still illustration and retains the same reflection and speech interface.
 
@@ -59,11 +59,12 @@ The app uses React, strict TypeScript, Vite, Three.js, React Three Fiber, and Dr
 | --- | --- |
 | Courtyard still and portrait surface texture | Original generated artwork created for this prototype. The same local WebP supplies the still and the projected texture. |
 | Geometry, stone, bark, clay textures, and Stillwater mark | Created for this project. |
-| DM Sans and Newsreader | Self-hosted Fontsource variable fonts, SIL Open Font License 1.1. [DM Sans notice](public/licenses/dm-sans.txt) and [Newsreader notice](public/licenses/newsreader.txt). |
+| Baskervville and IBM Plex Sans | Self-hosted Fontsource variable fonts, SIL Open Font License 1.1. [Baskervville notice](public/licenses/baskervville.txt) and [IBM Plex Sans notice](public/licenses/ibm-plex-sans.txt). |
+| English pronunciations | A local subset of the [CMU Pronouncing Dictionary](https://github.com/cmusphinx/cmudict), with two added biblical book names and expanded numbers. [Carnegie Mellon University license](public/licenses/cmudict.txt). |
 | Lucide interface icons | ISC and included upstream notices. [License](public/licenses/lucide.txt). |
 | Scripture | World English Bible, updated 66-book edition, public domain. [Edition and license](https://ebible.org/engwebp/). |
 
-Each verse is transcribed from the referenced World English Bible chapter. The dialogs link to Psalm 46:10, Psalm 34:18, John 13:34, Matthew 6:34, Ephesians 4:32, Psalm 145:14, and 1 Thessalonians 5:18. The demo response text is original commentary and paraphrase.
+Each verse is transcribed from the referenced World English Bible chapter. The dialogs link to Psalm 34:18, John 13:34, Matthew 6:34, Ephesians 4:32, Psalm 145:14, and 1 Thessalonians 5:18. The demo response text is original commentary and paraphrase.
 
 ## Roadmap
 

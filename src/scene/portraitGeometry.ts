@@ -1,4 +1,5 @@
-import { BufferAttribute, BufferGeometry, MathUtils } from 'three'
+import { BufferAttribute, BufferGeometry, Color, DynamicDrawUsage, MathUtils } from 'three'
+import type { AvatarPose } from './avatarMotion'
 
 const scale = 430
 const originX = 785
@@ -7,7 +8,7 @@ const imageWidth = 1536
 const imageHeight = 1024
 
 type Section = readonly [row: number, left: number, right: number]
-export const hairline: readonly Section[] = [
+const hairline: readonly Section[] = [
   [226, 746, 816], [234, 712, 850], [248, 683, 875], [271, 653, 890],
   [298, 630, 925], [322, 620, 939], [349, 608, 956], [369, 599, 969],
   [397, 592, 964], [424, 586, 975], [451, 590, 973], [476, 595, 974],
@@ -21,7 +22,10 @@ const shoulders: readonly Section[] = [
 ]
 
 export const skullPivot = 1.58
-const eyes = [{ x: 737, y: 418 }, { x: 842, y: 407 }] as const
+const eyes = [
+  { x: 737, y: 418, left: 708, right: 767, leftY: 425, rightY: 420, upper: 13, lower: 5.6 },
+  { x: 842, y: 407, left: 812, right: 874, leftY: 414, rightY: 407, upper: 12, lower: 5.3 },
+] as const
 
 function coords(x: number, y: number, depth: number) {
   return [(x - originX) / scale, (originY - y) / scale, depth] as const
@@ -51,10 +55,13 @@ function surface(x: number, y: number, head: boolean, front = true) {
   if (!front) return -.055 - (head ? .29 : .25) * curvature
   if (!head) return -.055 + (.165 + .083 * MathUtils.smoothstep(y, 620, 900)) * curvature
 
-  return -.055 + .258 * Math.pow(curvature, .86) +
-    .046 * bump(x, y, 789, 455, 31, 65) +
-    .077 * bump(x, y, 786, 484, 27, 19) +
-    .025 * bump(x, y, 777, 542, 62, 47) -
+  return -.055 + .256 * Math.pow(curvature, .87) +
+    .047 * bump(x, y, 790, 449, 29, 58) +
+    .079 * bump(x, y, 787, 480, 22, 19) +
+    .022 * bump(x, y, 767, 484, 12, 12) +
+    .018 * bump(x, y, 806, 478, 12, 12) +
+    .016 * bump(x, y, 798, 522, 44, 21) +
+    .027 * bump(x, y, 794, 571, 53, 31) -
     .036 * bump(x, y, eyes[0].x, eyes[0].y, 32, 19) -
     .034 * bump(x, y, eyes[1].x, eyes[1].y, 31, 17) +
     .027 * bump(x, y, 710, 461, 45, 28) +
@@ -93,9 +100,21 @@ function grid(columns: number, rows: number, sample: (s: number, t: number) => {
   return meshData(positions, uvs, indices)
 }
 
+export function blendPortraitLighting(geometry: BufferGeometry, robe: boolean) {
+  const texels = geometry.getAttribute('uv')
+  const colors = new BufferAttribute(new Float32Array(texels.count * 3), 3)
+  for (let i = 0; i < texels.count; i++) {
+    const y = (1 - texels.getY(i)) * imageHeight
+    // Both surfaces retain the same baked light where the neck and robe overlap.
+    const diffuse = robe ? MathUtils.smoothstep(y, 668, 735) : 1 - MathUtils.smoothstep(y, 540, 570)
+    colors.setXYZ(i, diffuse, diffuse, diffuse)
+  }
+  geometry.setAttribute('color', colors)
+}
+
 export function portraitShell(head: boolean, front: boolean) {
   const sections = head ? hairline : shoulders
-  return grid(head && front ? 98 : 42, head && front ? 112 : 52, (s, t) => {
+  return grid(52, 58, (s, t) => {
     const y = MathUtils.lerp(sections[0][0], sections[sections.length - 1][0], t)
     const [left, right] = range(sections, y)
     const shoulderEdge = head ? 0 : 2.6 * Math.sin(y * .081)
@@ -107,101 +126,208 @@ export function portraitShell(head: boolean, front: boolean) {
   }, !front)
 }
 
+
 export function eyeRig(index: 0 | 1) {
   const eye = eyes[index]
-  const shape = (s: number) => Math.sin(Math.PI * s) ** .75
-  const rim = (s: number) => eye.y - 6.9 * shape(s) - 3.5 * (s - .5)
-  const geometry = grid(22, 7, (s, t) => {
-    const x = eye.x + (s - .5) * 47
+  const outline = (s: number) => {
+    const height = Math.sin(Math.PI * s) ** .85
+    const baseline = MathUtils.lerp(eye.leftY, eye.rightY, s)
     return {
-      point: coords(x, rim(s), surface(x, rim(s), true) + .006),
-      texel: uv(x, eye.y - 8.8 - (1 - t) * 9 - 3.5 * (s - .5)),
+      x: MathUtils.lerp(eye.left, eye.right, s),
+      top: baseline - eye.upper * height,
+      bottom: baseline + eye.lower * height,
+      height,
     }
+  }
+  const columns = 25
+  const rows = 5
+  const makeLid = (upper: boolean) => grid(columns, rows, (s, t) => {
+    const { x, top, bottom, height } = outline(s)
+    const edge = upper ? top : bottom
+    const sampleY = upper ? top - (7.5 * (1 - t) + .4) * height : bottom + (3.5 * t + .2) * height
+    return { point: coords(x, edge, surface(x, edge, true)), texel: uv(x, sampleY) }
   })
-  const attribute = geometry.getAttribute('position')
-  geometry.boundingSphere = null
+  const upper = makeLid(true)
+  const lower = makeLid(false)
 
   function close(amount: number) {
-    for (let i = 0; i < attribute.count; i++) {
-      const s = (i % 23) / 22
-      const t = Math.floor(i / 23) / 7
-      const x = eye.x + (s - .5) * 47
-      const y = rim(s) + 15.5 * shape(s) * t * amount
-      attribute.setXYZ(i, ...coords(x, y, surface(x, y, true) + .006))
-    }
-    attribute.needsUpdate = true
-  }
-
-  return { geometry, close }
-}
-
-const mouthX = 787
-const mouthWidth = 78
-const mouthLine = (s: number) => 525 + Math.sin(Math.PI * s) * 1.5 - (s - .5) * 3
-const mouthContour = (s: number) => Math.sin(Math.PI * s) ** .85
-const center = (s: number, wide: number, round: number) =>
-  mouthX + ((s - .5) * mouthWidth) * (1 + .11 * wide - .22 * round)
-
-export function mouthRig() {
-  const columns = 32
-  const rows = 7
-  const makePart = (part: 'inside' | 'lip' | 'teeth') => grid(columns, rows, (s, t) => {
-    const x = center(s, 0, 0)
-    const y = mouthLine(s)
-    return { point: coords(x, y, surface(x, y, true)), texel: uv(x, y + (part === 'lip' ? 3 + t * 8 : 0)) }
-  })
-  const inside = makePart('inside')
-  const lip = makePart('lip')
-  const teeth = makePart('teeth')
-
-  function setPose(open: number, wide: number, round: number, press: number) {
-    const length = Math.max(.6, open * (19 + round * 4) - press * 2)
-    for (const [part, geometry] of [['inside', inside], ['lip', lip], ['teeth', teeth]] as const) {
+    for (const geometry of [upper, lower]) {
       const attribute = geometry.getAttribute('position')
       for (let i = 0; i < attribute.count; i++) {
         const s = (i % (columns + 1)) / columns
         const t = Math.floor(i / (columns + 1)) / rows
-        const x = center(s, wide, round)
-        const opening = mouthContour(s) * length
-        const top = mouthLine(s) - opening * .14
-        const closing = mouthLine(s) + opening
-        const y = part === 'inside' ? MathUtils.lerp(top, closing + 1.4, t)
-          : part === 'lip' ? closing + (2 + t * 7) * mouthContour(s)
-            : top + (1 + t * Math.min(4, length * .32)) * mouthContour(s)
-        const depth = surface(x, y, true) + (part === 'inside' ? .008 : part === 'lip' ? .011 : .009)
-        attribute.setXYZ(i, ...coords(x, y, depth))
+        const { x, top, bottom, height } = outline(s)
+        const meet = MathUtils.lerp(top, bottom, .83)
+        const y = geometry === upper
+          ? MathUtils.lerp(top, meet, amount * t)
+          : MathUtils.lerp(bottom, meet, amount * (1 - t))
+        attribute.setXYZ(i, ...coords(x, y, surface(x, y, true) + .0045 + height * .0015 * amount))
       }
       attribute.needsUpdate = true
+      geometry.computeVertexNormals()
     }
   }
 
-  return { inside, lip, teeth, setPose }
+  return { upper, lower, close }
 }
 
-export function faceRig(geometry: BufferGeometry) {
-  const position = geometry.getAttribute('position')
-  const texels = geometry.getAttribute('uv')
-  const bases = Array.from({ length: position.count }, (_, i) => {
+const mouthLeft = 753
+const mouthRight = 845
+const mouthCenter = (mouthLeft + mouthRight) / 2
+const lipLevel = 526
+const lipLine: readonly (readonly [x: number, y: number])[] = [
+  [730, lipLevel], [mouthLeft, 528.7], [766, 529], [781, 526.8], [795, 526.4],
+  [810, 524.3], [827, 522.4], [mouthRight, 518.6], [870, lipLevel],
+]
+
+function lipY(x: number) {
+  for (let i = 1; i < lipLine.length; i++) {
+    const [end, y] = lipLine[i]
+    const [start, previousY] = lipLine[i - 1]
+    if (x >= start && x <= end) return MathUtils.lerp(previousY, y, (x - start) / (end - start))
+  }
+  return lipLevel
+}
+
+function mouthEnvelope(x: number) {
+  const distance = MathUtils.clamp((x - mouthLeft) / (mouthRight - mouthLeft), 0, 1)
+  return Math.sin(distance * Math.PI) ** 1.14
+}
+
+type MouthPose = Pick<AvatarPose, 'open' | 'wide' | 'round' | 'press'>
+
+function lipWeights(x: number, y: number, lower: boolean) {
+  const distance = y - lipY(x)
+  const lip = mouthEnvelope(x)
+  const jaw = MathUtils.lerp(lip, .68 * bump(x, y, 796, 558, 72, 42), MathUtils.smoothstep(distance, 0, 24))
+  return {
+    lift: lower ? -14.8 * jaw : 4.2 * lip * Math.exp(-((distance / 16) ** 2)),
+    width: (x - mouthCenter) * bump(x, y, mouthCenter, lipLevel, 65, 33),
+    forward: bump(x, y, mouthCenter, lipLevel, 49, 20),
+  }
+}
+
+function poseVertex(
+  attribute: ReturnType<BufferGeometry['getAttribute']>, index: number,
+  x: number, y: number, z: number, weights: ReturnType<typeof lipWeights>, pose: MouthPose,
+  lift = weights.lift,
+) {
+  const width = pose.wide * .10 - pose.round * .21
+  const opening = pose.open * (1 - pose.press * .88)
+  attribute.setXYZ(index,
+    (x - originX + width * weights.width) / scale,
+    (originY - y + opening * lift) / scale,
+    z + weights.forward * (pose.round * .018 + pose.press * .003 - opening * .004),
+  )
+}
+
+function halfFace(lower: boolean) {
+  const geometry = grid(136, lower ? 56 : 111, (s, t) => {
+    const row = lower ? MathUtils.lerp(lipLevel, 659, t) : MathUtils.lerp(226, lipLevel, t)
+    const [left, right] = range(hairline, row)
+    const x = MathUtils.lerp(left, right, s)
+    const y = row + (lipY(x) - lipLevel) * Math.exp(-(((row - lipLevel) / 31) ** 2))
+    return { point: coords(x, y, surface(x, y, true)), texel: uv(x, y) }
+  })
+  const position = geometry.getAttribute('position') as BufferAttribute
+  const texels = geometry.getAttribute('uv') as BufferAttribute
+
+  position.setUsage(DynamicDrawUsage)
+  if (!lower) texels.setUsage(DynamicDrawUsage)
+  const mouth: { i: number; x: number; y: number; z: number; weights: ReturnType<typeof lipWeights> }[] = []
+  const expression: { i: number; u: number; v: number; gaze: number; brow: number }[] = []
+  for (let i = 0; i < position.count; i++) {
     const u = texels.getX(i)
     const v = texels.getY(i)
     const x = u * imageWidth
     const y = (1 - v) * imageHeight
-    const gaze = Math.max(...eyes.map((eye) => bump(x, y, eye.x, eye.y, 15, 7)))
-    const bottom = MathUtils.smoothstep(y, 525, 540)
-    const jaw = bottom * bump(x, y, 790, 551, 55, 38)
-    return { i, u, v, gaze, jaw, y: position.getY(i) }
-  })
-  const gazeVertices = bases.filter(({ gaze }) => gaze > .018)
-  const jawVertices = bases.filter(({ jaw }) => jaw > .015)
+    if (x > 688 && x < 910 && y > 482 && y < 638) {
+      mouth.push({ i, x, y, z: position.getZ(i), weights: lipWeights(x, y, lower) })
+    }
 
-  return (eyeX: number, eyeY: number, open: number) => {
-    for (const vertex of gazeVertices) {
-      texels.setXY(vertex.i, vertex.u + eyeX * vertex.gaze / imageWidth, vertex.v + eyeY * vertex.gaze / imageHeight)
+    if (!lower && y > 358 && y < 438 && x > 685 && x < 899) {
+      const gaze = Math.max(...eyes.map((eye) => bump(x, y, eye.x, eye.y, 15, 7)))
+      const brow = Math.max(...eyes.map((eye) => bump(x, y, eye.x + 1, eye.y - 29, 24, 9)))
+      if (gaze > .014 || brow > .014) expression.push({ i, u, v, gaze, brow })
     }
-    for (const vertex of jawVertices) {
-      position.setY(vertex.i, vertex.y - (open * vertex.jaw * 13) / scale)
-    }
-    texels.needsUpdate = true
-    position.needsUpdate = true
   }
+
+  const applied = { open: 0, wide: 0, round: 0, press: 0, eyeX: 0, eyeY: 0, brow: 0 }
+  const mouthChannels = ['open', 'wide', 'round', 'press'] as const
+  const eyeChannels = ['eyeX', 'eyeY', 'brow'] as const
+
+  return {
+    geometry,
+    move(pose: AvatarPose) {
+      if (mouthChannels.some((channel) => Math.abs(pose[channel] - applied[channel]) > .001)) {
+        for (const vertex of mouth) {
+          poseVertex(position, vertex.i, vertex.x, vertex.y, vertex.z, vertex.weights, pose)
+        }
+        for (const channel of mouthChannels) applied[channel] = pose[channel]
+        position.needsUpdate = true
+      }
+      if (expression.length && eyeChannels.some((channel) => Math.abs(pose[channel] - applied[channel]) > .005)) {
+        for (const vertex of expression) {
+          // The iris offset is confined to each pupil and the brow shift fades into the surrounding skin.
+          texels.setXY(vertex.i, vertex.u - pose.eyeX * vertex.gaze / imageWidth,
+            vertex.v - (pose.eyeY * vertex.gaze + 1.9 * pose.brow * vertex.brow) / imageHeight)
+        }
+        for (const channel of eyeChannels) applied[channel] = pose[channel]
+        texels.needsUpdate = true
+      }
+    },
+  }
+}
+
+function mouthInterior() {
+  const columns = 49
+  const rows = 15
+  const geometry = grid(columns, rows, (s) => {
+    const x = MathUtils.lerp(mouthLeft, mouthRight, s)
+    const y = lipY(x)
+    return { point: coords(x, y, surface(x, y, true)), texel: uv(x, y) }
+  })
+  const position = geometry.getAttribute('position') as BufferAttribute
+  position.setUsage(DynamicDrawUsage)
+  const colors = new BufferAttribute(new Float32Array(position.count * 3), 3).setUsage(DynamicDrawUsage)
+  const shadow = new Color('#20100e')
+  const palate = new Color('#5f302b')
+  const enamel = new Color('#b89575')
+  const shade = new Color()
+  const samples = Array.from({ length: position.count }, (_, i) => {
+    const s = (i % (columns + 1)) / columns
+    const t = Math.floor(i / (columns + 1)) / rows
+    const x = MathUtils.lerp(mouthLeft, mouthRight, s)
+    const y = lipY(x)
+    return {
+      t, x, y, z: surface(x, y, true) - .007 - .012 * Math.sin(Math.PI * t),
+      lower: lipWeights(x, y, true), upper: lipWeights(x, y, false),
+      inner: mouthEnvelope(x),
+    }
+  })
+  geometry.setAttribute('color', colors)
+
+  return {
+    geometry,
+    move(pose: MouthPose) {
+      for (let i = 0; i < samples.length; i++) {
+        const { t, x, y, z, lower, upper, inner } = samples[i]
+        const lift = MathUtils.lerp(upper.lift + .35, lower.lift - .55, t)
+        poseVertex(position, i, x, y, z, lower, pose, lift)
+        const toothLight = MathUtils.smoothstep(pose.open, .29, .59) * (1 - pose.press) * inner ** 2 *
+          Math.exp(-(((t - .21) / .10) ** 2)) * .77
+        shade.copy(shadow).lerp(palate, .54 * inner * t ** 3).lerp(enamel, toothLight)
+        colors.setXYZ(i, shade.r, shade.g, shade.b)
+      }
+      position.needsUpdate = true
+      colors.needsUpdate = true
+    },
+  }
+}
+
+export function faceRig() {
+  const top = halfFace(false)
+  const bottom = halfFace(true)
+  const interior = mouthInterior()
+  return { top, bottom, interior }
 }

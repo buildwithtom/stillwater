@@ -1,9 +1,9 @@
 import { lazy, Suspense, useState } from 'react'
 import type { RefObject } from 'react'
-import { BookOpen, Pause, Play, RotateCcw, Square } from 'lucide-react'
+import { Pause, Play, RotateCcw, Square, Volume2, VolumeX } from 'lucide-react'
 import { captionGroups } from '../speech/timing'
-import type { MouthFrame, SpeechPhase } from '../speech/useSpeech'
-import type { SpokenWord } from '../speech/timing'
+import type { MouthFrame, SpokenWord } from '../speech/timing'
+import type { SpeechPhase } from '../speech/useSpeech'
 import type { AvatarState } from '../scene/useAvatarState'
 import { SceneBoundary } from './SceneBoundary'
 import { portraitUrl } from '../scene/assets'
@@ -11,16 +11,15 @@ import { portraitUrl } from '../scene/assets'
 const LiveScene = lazy(() => import('../scene/CourtyardScene'))
 
 const labels: Record<AvatarState, string> = {
-  idle: 'At rest',
+  idle: '',
   listening: 'Listening',
   thinking: 'Reflecting',
   speaking: 'Speaking',
 }
 
-
 type SceneStatus = 'loading' | 'ready' | 'unsupported' | 'error'
 
-export function CourtyardStage({ state, reducedMotion, mouth, phase, words, index, notice, hasResponse, showVerse, replay, pause, stop, onVerse }: {
+type CourtyardProps = {
   state: AvatarState
   reducedMotion: boolean
   mouth: RefObject<MouthFrame>
@@ -29,18 +28,24 @@ export function CourtyardStage({ state, reducedMotion, mouth, phase, words, inde
   index: number
   notice: string
   hasResponse: boolean
-  showVerse: boolean
+  voiceLabel: string
+  voiceAvailable: boolean
+  voiceOn: boolean
+  onVoice: () => void
   replay: () => void
   pause: () => void
   stop: () => void
-  onVerse: () => void
-}) {
+}
+
+export function CourtyardStage({
+  state, reducedMotion, mouth, phase, words, index, notice, hasResponse,
+  voiceLabel, voiceAvailable, voiceOn, onVoice, replay, pause, stop,
+}: CourtyardProps) {
   const [sceneStatus, setSceneStatus] = useState<SceneStatus>('loading')
-  const groups = captionGroups(words)
-  const caption = groups.find((group) => index >= group.start && index < group.start + group.words.length)
+  const caption = captionGroups(words).find((group) => index >= group.start && index < group.start + group.words.length)
   const speaking = phase === 'speaking' || phase === 'paused'
   const active = phase !== 'idle'
-  const captionVisible = active && caption
+  const status = phase === 'paused' ? 'Voice paused' : labels[state]
 
   return (
     <section className="courtyard" aria-label="The Olive Courtyard">
@@ -55,51 +60,45 @@ export function CourtyardStage({ state, reducedMotion, mouth, phase, words, inde
             </SceneBoundary>
           </div>
         )}
-        <div className="stage-shade" aria-hidden="true" />
         <div className="stage-top">
-          <div className="stage-status" aria-live="polite">
-            <span className="state-dot" data-state={state} />
-            {phase === 'paused' ? 'Voice paused' : labels[state]}
-          </div>
+          <div className="stage-status" aria-live="polite">{status}</div>
           {sceneStatus !== 'ready' && (
             <span className="scene-mode">{sceneStatus === 'loading' ? 'Preparing 3D scene' : 'Still image · 3D unavailable'}</span>
           )}
         </div>
-        <div className="stage-bottom">
-          {captionVisible && (
+        {active && caption && (
+          <div className="stage-bottom">
             <p className="caption" key={caption.start} aria-hidden="true">
               {caption.words.slice(0, index - caption.start + 1).map((word) => <span key={word.at}>{word.text} </span>)}
             </p>
-          )}
-          <div className="stage-meta">
-            <span className="stage-title"><span aria-hidden="true" />The Olive Courtyard</span>
-            <span className="stage-context">Dramatized character</span>
           </div>
-        </div>
+        )}
       </div>
-      {hasResponse ? (
-        <div className="stage-toolbar">
-          <span className="voice-caption">{notice || 'Simulated voice · on-device playback'}</span>
-          <div className="playback" aria-label="Voice playback">
-            <button type="button" className="icon-button" title="Replay response" aria-label="Replay response" onClick={replay}>
-              <RotateCcw size={17} />
-            </button>
-            <button type="button" className="icon-button" title={phase === 'paused' ? 'Resume speech' : 'Pause speech'}
-              aria-label={phase === 'paused' ? 'Resume speech' : 'Pause speech'} disabled={!speaking} onClick={pause}>
-              {phase === 'paused' ? <Play size={16} /> : <Pause size={16} />}
-            </button>
-            <button type="button" className="icon-button" title="Stop playback" aria-label="Stop playback" disabled={!active} onClick={stop}>
-              <Square size={14} />
-            </button>
-          </div>
+      <div className="stage-toolbar">
+        <p className="stage-disclosure">Simulated biblical reflection</p>
+        <div className="stage-controls">
+          {hasResponse && (
+            <div className="playback" aria-label="Voice playback">
+              <button type="button" className="icon-button" title="Replay response" aria-label="Replay response" onClick={replay}>
+                <RotateCcw size={16} />
+              </button>
+              <button type="button" className="icon-button" title={phase === 'paused' ? 'Resume speech' : 'Pause speech'}
+                aria-label={phase === 'paused' ? 'Resume speech' : 'Pause speech'} disabled={!speaking} onClick={pause}>
+                {phase === 'paused' ? <Play size={15} /> : <Pause size={15} />}
+              </button>
+              <button type="button" className="icon-button" title="Stop playback" aria-label="Stop playback" disabled={!active} onClick={stop}>
+                <Square size={13} />
+              </button>
+            </div>
+          )}
+          <button type="button" className="voice-button" aria-pressed={voiceAvailable && voiceOn}
+            disabled={!voiceAvailable} onClick={onVoice}>
+            {voiceAvailable && voiceOn ? <Volume2 size={17} aria-hidden="true" /> : <VolumeX size={17} aria-hidden="true" />}
+            {voiceLabel}
+          </button>
         </div>
-      ) : showVerse ? (
-        <button className="stage-verse" type="button" onClick={onVerse}>
-          <BookOpen size={17} strokeWidth={1.55} aria-hidden="true" />
-          <span className="verse-excerpt">“Be still, and know that I am God.”</span>
-          <span className="verse-ref">Psalm 46:10</span>
-        </button>
-      ) : null}
+        {notice && <p className="voice-notice" role="status">{notice}</p>}
+      </div>
     </section>
   )
 }
